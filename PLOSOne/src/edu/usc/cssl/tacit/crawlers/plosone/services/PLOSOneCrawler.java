@@ -19,6 +19,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 public class PLOSOneCrawler {
 	
 	public final static int MAXIMUM_NETWORK_CALL_REATTEMPTS = 20;
@@ -86,6 +89,28 @@ public class PLOSOneCrawler {
 		}
 		
 
+	}
+	
+	/**
+	 * This method hits the API URL, extracts and returns the number of rows in the results. 
+	 * @param url 
+	 * @return
+	 */
+	private static int getNumOfRows(String url){
+		String jsonResponse = getHTTPResponse(url);
+		JSONObject resultJSONObject;
+		int numOFRows = 0;
+		if (!jsonResponse.equals("")){
+			resultJSONObject = new JSONObject(jsonResponse);
+			try{
+				numOFRows = resultJSONObject.getJSONObject("response").getInt("numFound");
+			}catch(JSONException e){
+				return 0;
+			}
+		}else{
+			return 0;
+		}
+		return numOFRows;
 	}
 	
 	/**
@@ -161,7 +186,7 @@ public class PLOSOneCrawler {
 	 * @param inputQuery
 	 * @return
 	 */
-/*	public static String getModifiedQuery(String inputQuery){
+	public static String getModifiedQuery(String inputQuery){
 		
 		StringBuilder modifiedStringBuilder = new StringBuilder("");
 		String keywords[] = inputQuery.split(";");
@@ -176,10 +201,16 @@ public class PLOSOneCrawler {
 			
 			keyword = keyword.replaceAll(" ", "%20");
 			
-			modifiedStringBuilder.append(str)
+			modifiedStringBuilder.append(keyword+"%20OR%20");
 			
 		}
-	}*/
+		
+		if (modifiedStringBuilder.length() > 0 ){
+			modifiedStringBuilder.delete(modifiedStringBuilder.length()-8, modifiedStringBuilder.length());
+		}
+		
+		return modifiedStringBuilder.toString();
+	}
 	
 	public static void main(String args[]) throws IOException{
 		
@@ -196,9 +227,9 @@ public class PLOSOneCrawler {
 		urlFeatures.put(PLOSOneWebConstants.FEATURE_FIELDS, getOutputFields(outputFields));
 		urlFeatures.put(PLOSOneWebConstants.FEATURE_FILTER_QUERY, "doc_type:full");
 		urlFeatures.put(PLOSOneWebConstants.FEATURE_ROWS, "100");
-		urlFeatures.put(PLOSOneWebConstants.FEATURE_QUERY, "computer%20science");
+		urlFeatures.put(PLOSOneWebConstants.FEATURE_QUERY, getModifiedQuery("machine learning;neuralnets"));
 
-		
+		System.out.println(getNumOfRows(buildURL(urlFeatures)));
 		String output = getHTTPResponse(buildURL(urlFeatures));
 		Date dateObj = new Date();
 		DateFormat df = new SimpleDateFormat("MM-dd-yy-HH-mm-ss");

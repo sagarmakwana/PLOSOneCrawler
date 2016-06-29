@@ -2,7 +2,7 @@ package edu.usc.cssl.tacit.crawlers.plosone.services;
 
 public class PLOSOneWebConstants {
 	
-	public static final String TEST_API_KEY = "your key";
+	public static final String TEST_API_KEY = "f8527043-55cb-4d15-8d70ba8d9f85cd57";
 	
 	public static final String BASE_URL = "http://api.plos.org/search";
 	
@@ -32,6 +32,8 @@ public class PLOSOneWebConstants {
 	public static final String FIELD_TITLE = "title";
 	
 	public static final String FIELD_AUTHOR = "author";
+	
+	public static final String FIELD_EVERYTHING = "everything";
 	
 	public static final String FIELD_ABSTRACT = "abstract";
 	
