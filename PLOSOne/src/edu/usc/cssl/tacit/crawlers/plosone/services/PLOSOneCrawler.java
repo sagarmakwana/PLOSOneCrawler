@@ -18,7 +18,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -27,7 +26,7 @@ public class PLOSOneCrawler {
 	
 	public final static int MAXIMUM_NETWORK_CALL_REATTEMPTS = 20;
 	
-	public final static int DOCUMENTS_PER_RESPONSE_PAGE = 10;
+	public final static int DOCUMENTS_PER_RESPONSE_PAGE = 100;
 
 	/**
 	 * This method returns the JSON HTTP response string for the input string URL 
@@ -185,11 +184,12 @@ public class PLOSOneCrawler {
 	}
 	
 	/**
-	 * 
-	 * @param inputQuery
+	 * This method converts the raw query given by the user and converts it into the format required by the API.
+	 * @param tag It indicates in what section the search has to be concentrated.
+	 * @param inputQuery Raw input query from the user.
 	 * @return
 	 */
-	public static String getModifiedQuery(String inputQuery){
+	public static String getModifiedQuery(String tag,String inputQuery){
 		
 		StringBuilder modifiedStringBuilder = new StringBuilder("");
 		String keywords[] = inputQuery.split(";");
@@ -212,33 +212,67 @@ public class PLOSOneCrawler {
 			modifiedStringBuilder.delete(modifiedStringBuilder.length()-8, modifiedStringBuilder.length());
 		}
 		
-		return modifiedStringBuilder.toString();
+		return tag+":"+modifiedStringBuilder.toString();
 	}
 	
-	public static JSONArray buildPagedResponses(Map<String, String> urlFeatures){
-		JSONArray overallResponse = new JSONArray();
-		int numOfRows = getNumOfRows(buildURL(urlFeatures));
+	
+	/**
+	 * This method breaks the request into several pages and writes the response of each request to the input file.
+	 * @param urlFeatures
+	 * @param noOfDocuments
+	 * @param fileWriter
+	 * @throws IOException
+	 */
+	public static void writePagedResponses(Map<String, String> urlFeatures,int noOfDocuments, FileWriter fileWriter)throws IOException{
+
 		
-		int numOfRequests = numOfRows/DOCUMENTS_PER_RESPONSE_PAGE ;
+		boolean leftover = false;
 		
-		if (numOfRows%DOCUMENTS_PER_RESPONSE_PAGE != 0){
+		//If the user does not indicate the number of documents then by default it should download all the documents
+		if (noOfDocuments == -1){
+			noOfDocuments = getNumOfRows(buildURL(urlFeatures));
+		}
+		 
+		int numOfRequests = noOfDocuments/DOCUMENTS_PER_RESPONSE_PAGE ;
+		
+		if (noOfDocuments%DOCUMENTS_PER_RESPONSE_PAGE != 0){
 			numOfRequests++; //Extra request for the leftover documents
+			leftover = true;
+		}
+		
+		//This condition ensures that the file is written only if atleast one request is to be made.
+		if (numOfRequests != 0){
+			fileWriter.write("[");
 		}
 		
 		String singleResponse;
 		int startIndex = 0; 
 		for(int i = 0; i < numOfRequests; i++){
+			System.out.println(startIndex);
+			
+			//This condition ensures that only the required number of documents are downloaded in the last request.
+			if (i == numOfRequests-1 && leftover){
+				urlFeatures.put(PLOSOneWebConstants.FEATURE_ROWS, (noOfDocuments%DOCUMENTS_PER_RESPONSE_PAGE)+"");
+			}
+			
 			singleResponse = getHTTPResponse(buildURL(urlFeatures));
 			
-			//TODO:  Extract the documents from single response and add it to the overall response
+
+			JSONObject singleResponseDocuments = new JSONObject(singleResponse);
+			singleResponse = singleResponseDocuments.getJSONObject("response").getJSONArray("docs").toString();
+			singleResponse = singleResponse.substring(singleResponse.indexOf("[")+1,singleResponse.lastIndexOf("]")).trim();
+			
+			//This condition checks for the last request.
+			if (i == numOfRequests-1){
+				fileWriter.write(singleResponse + "]");
+			}else{
+				fileWriter.write(singleResponse + ", ");
+			}
 			
 			startIndex += DOCUMENTS_PER_RESPONSE_PAGE; //Updating the start index for the next request
 			urlFeatures.put(PLOSOneWebConstants.FEATURE_START, startIndex+"");
 		}
-		
-		
-		
-		return overallResponse;	
+			
 	}
 	
 	
@@ -250,26 +284,27 @@ public class PLOSOneCrawler {
 		outputFields.add(PLOSOneWebConstants.FIELD_TITLE);
 		outputFields.add(PLOSOneWebConstants.FIELD_ABSTRACT);
 		outputFields.add(PLOSOneWebConstants.FIELD_BODY);
-
+		
+		
+		//Building the url features for hitting the API
 		Map<String,String> urlFeatures = new HashMap<String,String>();
 		urlFeatures.put(PLOSOneWebConstants.FEATURE_APIKEY, PLOSOneWebConstants.TEST_API_KEY);
 		urlFeatures.put(PLOSOneWebConstants.FEATURE_DOCTYPE, "json");
 		urlFeatures.put(PLOSOneWebConstants.FEATURE_FIELDS, getOutputFields(outputFields));
 		urlFeatures.put(PLOSOneWebConstants.FEATURE_FILTER_QUERY, "doc_type:full");
-		urlFeatures.put(PLOSOneWebConstants.FEATURE_QUERY, getModifiedQuery("machine learning;neuralnets"));
+		urlFeatures.put(PLOSOneWebConstants.FEATURE_QUERY, getModifiedQuery(PLOSOneWebConstants.FIELD_EVERYTHING,"machine learning;neuralnets"));
 		//This is the number of documents in a single paged response. Several pages need to be combined.
 		urlFeatures.put(PLOSOneWebConstants.FEATURE_ROWS, DOCUMENTS_PER_RESPONSE_PAGE + ""); 
 		//Initialize start to 0.
 		urlFeatures.put(PLOSOneWebConstants.FEATURE_START, "0");
 		
-		String output = getHTTPResponse(buildURL(urlFeatures));
+		
 		Date dateObj = new Date();
 		DateFormat df = new SimpleDateFormat("MM-dd-yy-HH-mm-ss");
-		FileWriter fileWriter = new FileWriter(new File("/Users/CSSLadmin/Desktop/TestOutput/plos_"+df.format(dateObj)+".txt"));
-		
-		fileWriter.write(output);
-		
+		FileWriter fileWriter = new FileWriter(new File("/Users/CSSLadmin/Desktop/TestOutput/plos_"+df.format(dateObj)+".json"));
+		writePagedResponses(urlFeatures,210,fileWriter);
 		fileWriter.close();
+		
 		
 	}
 }
