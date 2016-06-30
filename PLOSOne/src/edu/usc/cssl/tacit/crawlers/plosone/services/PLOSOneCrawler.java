@@ -19,12 +19,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 public class PLOSOneCrawler {
 	
 	public final static int MAXIMUM_NETWORK_CALL_REATTEMPTS = 20;
+	
+	public final static int DOCUMENTS_PER_RESPONSE_PAGE = 10;
 
 	/**
 	 * This method returns the JSON HTTP response string for the input string URL 
@@ -212,9 +215,36 @@ public class PLOSOneCrawler {
 		return modifiedStringBuilder.toString();
 	}
 	
+	public static JSONArray buildPagedResponses(Map<String, String> urlFeatures){
+		JSONArray overallResponse = new JSONArray();
+		int numOfRows = getNumOfRows(buildURL(urlFeatures));
+		
+		int numOfRequests = numOfRows/DOCUMENTS_PER_RESPONSE_PAGE ;
+		
+		if (numOfRows%DOCUMENTS_PER_RESPONSE_PAGE != 0){
+			numOfRequests++; //Extra request for the leftover documents
+		}
+		
+		String singleResponse;
+		int startIndex = 0; 
+		for(int i = 0; i < numOfRequests; i++){
+			singleResponse = getHTTPResponse(buildURL(urlFeatures));
+			
+			//TODO:  Extract the documents from single response and add it to the overall response
+			
+			startIndex += DOCUMENTS_PER_RESPONSE_PAGE; //Updating the start index for the next request
+			urlFeatures.put(PLOSOneWebConstants.FEATURE_START, startIndex+"");
+		}
+		
+		
+		
+		return overallResponse;	
+	}
+	
+	
 	public static void main(String args[]) throws IOException{
 		
-
+		//Add all the fields that are required in the output
 		List<String> outputFields = new ArrayList<String>();
 		outputFields.add(PLOSOneWebConstants.FIELD_AUTHOR);
 		outputFields.add(PLOSOneWebConstants.FIELD_TITLE);
@@ -226,10 +256,12 @@ public class PLOSOneCrawler {
 		urlFeatures.put(PLOSOneWebConstants.FEATURE_DOCTYPE, "json");
 		urlFeatures.put(PLOSOneWebConstants.FEATURE_FIELDS, getOutputFields(outputFields));
 		urlFeatures.put(PLOSOneWebConstants.FEATURE_FILTER_QUERY, "doc_type:full");
-		urlFeatures.put(PLOSOneWebConstants.FEATURE_ROWS, "100");
 		urlFeatures.put(PLOSOneWebConstants.FEATURE_QUERY, getModifiedQuery("machine learning;neuralnets"));
-
-		System.out.println(getNumOfRows(buildURL(urlFeatures)));
+		//This is the number of documents in a single paged response. Several pages need to be combined.
+		urlFeatures.put(PLOSOneWebConstants.FEATURE_ROWS, DOCUMENTS_PER_RESPONSE_PAGE + ""); 
+		//Initialize start to 0.
+		urlFeatures.put(PLOSOneWebConstants.FEATURE_START, "0");
+		
 		String output = getHTTPResponse(buildURL(urlFeatures));
 		Date dateObj = new Date();
 		DateFormat df = new SimpleDateFormat("MM-dd-yy-HH-mm-ss");

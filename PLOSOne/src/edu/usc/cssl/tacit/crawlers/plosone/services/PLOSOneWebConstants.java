@@ -24,6 +24,8 @@ public class PLOSOneWebConstants {
 	
 	public static final String FEATURE_FIELDS = "fl";
 	
+	public static final String FEATURE_START = "start";
+	
 	
 	//API fields
 
